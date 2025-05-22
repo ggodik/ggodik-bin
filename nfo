@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Check if no arguments are provided
+if [ "$#" -eq 0 ]; then
+    # Print the .info file
+    if [ -f .info ]; then
+        cat .info
+    else
+        echo "Error: .info file not found."
+    fi
+    exit 0
+fi
+
+# Check if the correct number of arguments is provided
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <line_number>"
+    exit 1
+fi
+
+# Get the line number from the argument
+line_number=$1
+
+# Check if the line number is a valid positive integer
+if ! [[ "$line_number" =~ ^[0-9]+$ ]] || [ "$line_number" -le 0 ]; then
+    echo "Error: Line number must be a positive integer."
+    exit 1
+fi
+
+# Get the command from the nth line of the .info file
+command=$(sed -n "${line_number}p" .info)
+
+# Check if the command is empty
+if [ -z "$command" ]; then
+    echo "Error: No command found on line $line_number."
+    exit 1
+fi
+
+# Check if the command starts with a #
+if [[ "$command" =~ ^# ]]; then
+    echo "$command"
+    exit 0
+fi
+
+# Execute the command
+eval "$command"
