@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Parse arguments
+NO_LINT=false
+NO_TEST=false
+COMMIT_MSG=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --no-lint)
+            NO_LINT=true
+            shift
+            ;;
+        --no-test)
+            NO_TEST=true
+            shift
+            ;;
+        *)
+            COMMIT_MSG="$1"
+            shift
+            ;;
+    esac
+done
+
+[ -z "$COMMIT_MSG" ] && { echo "Usage: $0 [--no-lint] [--no-test] 'commit message'"; exit 1; }
+
+# Check if this is a Go repository
+if [ -f "go.mod" ]; then
+    echo "Go repository detected. Running checks..."
+
+    # Run go fmt
+    echo "Running go fmt ./..."
+    go fmt ./...
+    if [ $? -ne 0 ]; then
+        echo "go fmt failed. Aborting."
+        exit 1
+    fi
+
+    # Run golangci-lint (unless --no-lint flag is set)
+    if [ "$NO_LINT" = false ]; then
+        echo "Running golangci-lint.exe run..."
+        golangci-lint.exe run
+        if [ $? -ne 0 ]; then
+            echo "golangci-lint failed. Aborting."
+            exit 1
+        fi
+    else
+        echo "Skipping golangci-lint (--no-lint flag set)."
+    fi
+
+    # Run go test (unless --no-test flag is set)
+    if [ "$NO_TEST" = false ]; then
+        echo "Running go test ./..."
+        go test ./...
+        if [ $? -ne 0 ]; then
+            echo "go test failed. Aborting."
+            exit 1
+        fi
+    else
+        echo "Skipping go test (--no-test flag set)."
+    fi
+
+    echo "All Go checks passed."
+fi
+
+# Check if this is a Python repository
+if [ -d "Scripts" ] && [ -f "Scripts/activate" ]; then
+    echo "Python repository detected. Running checks..."
+
+    # Check if black exists
+    if command -v black &> /dev/null; then
+        echo "Running black on all Python files..."
+        black .
+        if [ $? -ne 0 ]; then
+            echo "black failed. Aborting."
+            exit 1
+        fi
+    else
+        echo "black not found. Skipping black formatting."
+    fi
+
+    # Check if autopep8 exists
+    if command -v autopep8 &> /dev/null; then
+        echo "Running autopep8 on all Python files..."
+        autopep8 --in-place --recursive .
+        if [ $? -ne 0 ]; then
+            echo "autopep8 failed. Aborting."
+            exit 1
+        fi
+    else
+        echo "autopep8 not found. Skipping autopep8 formatting."
+    fi
+
+    echo "All Python checks passed."
+fi
+
+# Proceed with git commands
+git add .
+git commit -m "$COMMIT_MSG"
+
+# Check if remote exists before pushing
+if git remote | grep -q .; then
+    echo "Pushing to remote..."
+    git push origin $(git rev-parse --abbrev-ref HEAD)
+else
+    echo "No remote configured. Skipping push."
+fi
